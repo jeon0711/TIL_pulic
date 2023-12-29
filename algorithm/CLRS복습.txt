@@ -1,0 +1,42 @@
+일반적으로 최적해를 찾는데 걸리는 시간이 직접찾는데 걸리는 시간보다 적다.
+14.2
+Matrix-chain multiplication
+parenthesizations(괄호)
+matrices is fully parenthesized if it is either a single matrix 
+or the product of two fully parenthesized matrix products, surrounded by parentheses.
+괄호묶는 방법에 따라 막대한 연산량차이발생
+
+matrix-chain multiplication problem:
+given a chain <A1,...An>of n matrices, where for i=1,...n, matrix Ai has dimension pi-1*pi, fully parentheisize the product A1,...An in a way that minimizes the number of scalar multiplications
+(input is the sequence of dimensions <p0,...pn>.
+
+The goal is only to determine an order for multiplying matrices that has the lowest cost.
+
+Denote the number of alternative parenthesizations of a sequence of n matrices by P(n)
+then P(n)=sum of(P(k)P(n-k))k=1~n-1
+//행렬곱은 언제나 두 행렬의 곱이므로 마지막 product는 반드시 P(k)개,P(n-k)개의 곱이다.
+
+카탈랑수는 C0=1,Cn+1=sumof(Cn*Cn-k)로 나타내지는 순서열이며 n번째
+카탈랑 수 Cn=2nCn/n+1=2n!/(n+1)*n!이다.
+
+카탈랑수는 위의 괄호매칭문제,n개노드 가진 이진트리의 수의 개수, n+2각형을 서로 겹치지 않는 대각선을 그려 삼각형으로 분할하는 방법의 수등을 나타낸다.
+
+카탈랑수의 점화식을 가지고 일반생성함수(수열의 값을 계수로 두고 거듭제곱값을 항으로)를 만들고 제곱하면 위의 정의상 x^i의 계수가 Ci+1이 된다. 
+따라서 x*f(x)^2+1=fx이므로 fx에 대한 이차방정식을 풀면
+fx=1+-(1-4x)^1/2/2x이다. 이때 x=0일때 C0=1인 경계조건을 만족시키는 경우는
+1-(1-4x)^1/2/2x뿐이며, 모든 조건을 만족하므로 이값이 fx이다. 그러나 
+fx는 x에 관한 식이고 구하려는것은 최초의 형태꼴에서의 x의 계수이므로 fx에 대해 테일러전개를 해야한다. (1-4x)^1/2에 대해 테일러전개로 전개시켜 최종적으로 Ck*x^k꼴의 무한합으로 만들어 열거가능하고 일대일대응되므로 해당값인 Ck의 수열이 존재한다고 보는듯 하다.(이것 만 가능한지에 대한 증명까지 포함되는 증명인지는 모르겠다)
+
+applying dynamic programming
+step 1:the structure of optimal parenthesization
+구간 i,j에서 k를 중심으로 좌,우측분할,
+최종적으로 어떤 분할을 하던, 그 분할 내에서의 곱은 최적값이여야 한다. 그렇지 않으면 더 작은 값이 존재하므로 해당값으로의 분할시가 더 작은값을 리턴, 모순이 된다.(다른 분할들 전체보다 작지 않아도 괜찮다 결합시의 비용이 또 있으니)
+따라서 최적부분구조를 가지고 어떻게 모델링할지도 알았다.
+step2: A recursive solution:
+m[i:j]=m[i,k]+m[k+1,j]+pi-1*pk*pj(행렬곱은 a행 b열 b행 c열로 곱해 a행 c열이 남으므로 i번째의 행(i-1번째의 열)*k번째열,k번째열*j번째열 의 곱이 된다. 결과 행렬의 i,j번째값은 앞의 행렬의 i행,뒤의 행렬의 j열의 곱이므로 k번의 곱,k번의 덧셈으로 나온다. 따라서 한번의 연산비용이O(k)이고 i,j번 하므로 총비용은 O(pi-1*pk*pj)가 된다)
+이제 최적부분구조를 가지고 재귀해를 구했다
+step 3:computing the optimal costs:
+최적부분구조를 table을 이용해 기록해가며 계산한다.
+상향식으로 가면 2개씩 묶었을때의 비용을 기록하고 다시 그것과 위로묶었을때의 비용중 최소값을 기록하고,,하는식으로 최종적으로 구간 전체가 될때까지 올라가되, 그떄의 분할위치도 기록한다.
+step4: constructing an optimal solution:
+최적 값을 가지는 분할위치 기록해둔 테이블 가지고 내려가며 나눠서 출력.
