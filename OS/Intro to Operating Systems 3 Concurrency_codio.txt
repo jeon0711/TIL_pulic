@@ -1,1 +1,37 @@
 multi-cpu-scheduling
+single- and multiprocessor is mainly around the use of hardware caches and how data is shared across processors.
+
+복습하자면,cashe는 주로 association memory다.
+main memory의 주소일부를 key로 가지고 해당 데이터를 value로 가지며 key값으로 검색하는게 O(1)
+
+Cache Coherence(캐시 일관성) is the problem that arises when multiprocessor system processes need a copy of the same memory block.
+
+캐시에 있는 데이터가 원본과 달라지는 문제
+
+Locks are required to atomically update the data structure.
+
+Cache affinity(캐시 선호도)(하드웨어 레벨 프로토콜인듯)
+SQMS:single-queue multiprocessor scheduling
+flaws(결함)of sqms:
+scalability(확장성):
+동일 lock을 전체가 사용함.
+Cache Affinity:
+Because each CPU simply takes the next job from the globally shared queue, each job ends up bouncing from CPU to CPU, which is contrary to cache affinity.
+affinity mechanism to try to keep processes on the same CPU if possible. 
+
+Multi-Queue Scheduling:
+The scheduling framework in MQMS consists of multiple scheduling queues. 
+Each queue will likely use a different scheduling technique.
+When a job is entered into the system, it is placed on exactly one scheduling queue according to some rule (e.g., random, or 
+picking one with fewer jobs than others).
+
+Then, each component is scheduled primarily independently, so there are no concerns with information sharing and synchronization.
+
+MQMS should be more scalable than SQMS. MQMS also supports cache affinity. Jobs stay on the same CPU, allowing them to reuse cached items.
+
+Handling Load Imbalance
+migration:moving jobs between CPUs
+Work stealing:
+a queue that is low on jobs occasionally peeks into another queue, to determine how full it is
+
+4주차2번부터
