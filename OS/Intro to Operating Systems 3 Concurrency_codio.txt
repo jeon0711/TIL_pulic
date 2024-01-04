@@ -34,4 +34,41 @@ migration:moving jobs between CPUs
 Work stealing:
 a queue that is low on jobs occasionally peeks into another queue, to determine how full it is
 
-4주차2번부터
+
+Dynamic Relocation
+base and bounds, which is also called dynamic relocation.
+
+Each CPU requires two hardware registers: one register is called the base while the other is called the bounds
+
+The base-and-bound pair allows the system to place the address space wherever it wants in physical memory. The register pair also ensures that the process only has access to its own address space.
+
+virtual address + base = physical address
+
+Address Translation
+Each processor has something called the memory management unit 
+
+Hardware Support
+Privileged (Kernel) Mode
+This prevents user applications from performing privileged operations.
+Base & Bounds Registers
+This pair of registers is used to store required information for the translation process.
+Address Translation and Verification
+Circuitry is required to perform the translations and then check limits.
+Update Bounds (Privileged Instruction)
+The OS has to be able to set these values before allowing a user program to run.
+Register Exception Handlers
+OS must have the ability to tell the hardware what code to run in the event of an exception.
+Raise Exceptions
+OS needs to raise exceptions when a process tries to perform an illegal operation (privileged instruction, out of bounds memory, etc.).
+
+All of this is done using a limited direct execution strategy
+
+This lesson applied what we know about limited direct execution to virtual memory through the use of address translation.
+Address translation permits the OS to regulate every memory access made by a process by keeping them within its address space.
+Base and bounds virtualization, also known as dynamic relocation, protects against memory references outside a process’s address area.
+Internal fragmentation results from the limitation of placing an address space in a fixed-sized slot even there may be enough sufficient physical memory for more processes.
+
+4-3 부터
+여기부터
+
+

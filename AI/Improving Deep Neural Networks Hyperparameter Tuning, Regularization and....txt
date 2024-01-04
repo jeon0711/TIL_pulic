@@ -23,4 +23,23 @@ mini batch에서는 비용함수가 증가할수도 있다.
 
 미니배치가 cpu,gpu 내부 메모리에 들어가는걸 보장하는게 낫다.(크기를 조정해서)
 
-exponentially weighted averages부터
+exponentially weighted (moving) averages
+(지수가중평균,지수가중이동평균)
+지수평활같은데?맞다. b*Vn-1+(1-b)*a=Vn
+시계열 데이터등
+
+지수평활 bias correction
+초기값을 0으로 하고 시작하는데 
+기존에 구한값=Vt/1-B^t->vt로 하는것
+t가 커지면 0으로 수렴하므로
+
+Gradient descent with momentum
+모멘텀,혹은 기울기 모멘텀. 
+매번 반복 t마다 dw,db를 산출할때
+Vdw=bVdw+(1-b)dw로 계산하여 Vdc=bVdc+(1-b)dc로 연산.
+(V항은 새로 연산하는 속도항이다,Vdc,Vdw=0로 초기화되 시작)
+W=W-aVdw로 update,c=c-aVdb로 update한다
+
+bVdw+dw=Vdw등으로 나타내는건 1-b를 생략한 표현이고 실제로는 들어가야한다.
+
+RMSprop부터

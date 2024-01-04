@@ -1,0 +1,44 @@
+싱글 스레드,이벤트 기반 아키텍쳐,이벤트 루프가 싱글 스레드이고 스레드 워커는 멀티스레드.
+미들웨어 함수들의 합성함수 꼴인듯. 
+app.use('/path', (req, res, next) => {
+  // '/path' 경로에 대한 요청에 대해서만 실행
+  next();
+});
+app.use((req, res, next) => {
+  // 미들웨어 로직
+  next();
+});
+next() 함수를 호출하지 않고 res 객체를 사용해 응답을 보내면 (예: res.send(), res.json(), res.end() 등을 사용), 해당 미들웨어에서 요청-응답 사이클이 완료되고 더 이상의 미들웨어는 실행되지 않습니다.
+
+res.send() 함수의 주요 특징은 다음과 같습니다:
+
+다양한 유형의 응답 지원: 이 함수는 문자열, HTML, JSON, Buffer(바이너리 데이터 처리) 등 다양한 유형의 데이터를 응답 본문으로 보낼 수 있습니다. 함수는 전달된 데이터의 유형을 자동으로 감지하여 적절한 Content-Type 헤더를 설정합니다.
+
+자동 변환: 객체나 배열이 전달되면, res.send()는 자동으로 이를 JSON으로 변환하여 보냅니다.
+
+응답 상태 코드: 기본적으로, res.send()는 HTTP 상태 코드 200(OK)을 응답으로 보냅니다. 필요한 경우 res.status() 함수와 함께 사용하여 다른 상태 코드를 설정할 수 있습니다.
+
+응답 종료: res.send() 함수 호출 후, Express는 HTTP 응답을 클라이언트에게 전송하고 연결을 종료합니다. 따라서 이 함수 호출 이후에는 해당 요청에 대한 추가 작업을 수행할 수 없습니다.
+라고 한다.
+
+지금 구조는 app->index->ctrl->service꼴인듯.
+
+app.use를 사용하여 index.ts 파일에서 정의된 라우터를 활성화하는 과정은 다음과 같습니다:
+
+라우터 모듈 정의: src/router 폴더 내의 index.ts 파일에서, express.Router()를 사용하여 새로운 라우터 인스턴스를 생성하고, 이 인스턴스에 대한 라우트 핸들러를 정의합니다. 예를 들어, hansic 라우터에서는 특정 경로에 대해 GET, POST, PUT, DELETE 등의 HTTP 메소드를 처리하는 로직을 구현할 수 있습니다.
+
+라우터 모듈 사용: app.ts 파일 또는 메인 애플리케이션 파일에서, app.use('/somepath', someRouter) 형식으로 해당 라우터 모듈을 사용합니다. 여기서 someRouter는 src/router 폴더의 index.ts 파일에서 module.exports 또는 export default를 통해 내보낸 라우터 객체입니다.
+
+경로 매핑: app.use에 제공된 경로(예: /somepath)는 해당 라우터의 기본 경로가 됩니다. 이후 이 라우터에 정의된 모든 라우트는 이 기본 경로를 기준으로 합니다.
+
+예를 들어, app.ts에서 다음과 같은 코드를 사용할 수 있습니다:
+
+javascript
+Copy code
+const hansicRouter = require('./src/router/hansic/index');
+app.use('/hansic', hansicRouter);
+이 경우, hansic 라우터에 정의된 모든 라우트는 /hansic 경로로 시작하게 됩니다. 예를 들어, hansic/index.ts에서 router.get('/items', handler)를 정의했다면, 해당 엔드포인트의 전체 경로는 /hansic/items가 됩니다.
+
+따라서 app.use를 사용하는 것은 index.ts 파일에서 정의된 express.Router() 인스턴스를 메인 애플리케이션에 연결하고, 해당 라우터의 라우트를 애플리케이션의 URL 구조에 매핑하는 과정입니다.
+라고한다
+Node.js에서 특정 디렉토리의 index.js 또는 index.ts 파일은 그 디렉토리를 임포트할 때 자동으로 참조됩니다. 예를 들어, require('./src/router')와 같이 쓸 경우, ./src/router/index.js 또는 ./src/router/index.ts 파일을 자동으로 찾아 임포트합니다.
