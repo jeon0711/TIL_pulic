@@ -68,7 +68,33 @@ Address translation permits the OS to regulate every memory access made by a pro
 Base and bounds virtualization, also known as dynamic relocation, protects against memory references outside a process’s address area.
 Internal fragmentation results from the limitation of placing an address space in a fixed-sized slot even there may be enough sufficient physical memory for more processes.
 
-4-3 부터
-여기부터
+you simply wait for something (i.e., an “event”) to happen; when it does, you determine what
+type of event it is and perform the minimal work required (which may
+include making I/O requests or scheduling other events for future handling,
+among other things).
+
+The main loop simply waits for something to happen, and then processes each event one by one
+
+one event is handled at a time, there is no need for locks to be acquired or released;
+the event-based server cannot be interrupted by another thread because it
+is single threaded.
+
+asynchronous I/O to get around
+this limitation. This is a new technique for sending I/O requests to the disk
+system. Applications can use these interfaces to send an I/O request and
+swiftly return control to the caller before the I/O is completed;
 
 
+. In thread-based
+programs, state is already on the thread stack when an asynchronous I/O is
+issued, so there’s no need for the event handler to package up state so the
+following handler can use it after the I/O has been completed. This effort is
+referred to as manual stack management by Adya et al., and it is essential
+to event-based programming.
+
+simply store the necessary information to complete
+processing of this event in some data structure; when the event occurs (i.e.,
+when the disk I/O completes), search up the required information and
+handle the event.
+
+node 가 single event loop기반 서버. 시간이 걸리는건 하위 워커쓰레드에 주고 처리. IO처럼. Promise가 처리상태정보 가지는것처럼 똑같이 필수적인 정보가 해당 핸들러에 저장되어있어야.

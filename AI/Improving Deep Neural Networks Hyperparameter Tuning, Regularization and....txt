@@ -43,3 +43,34 @@ W=W-aVdw로 update,c=c-aVdb로 update한다
 bVdw+dw=Vdw등으로 나타내는건 1-b를 생략한 표현이고 실제로는 들어가야한다.
 
 RMSprop부터
+
+
+RMSprop(rootmean square prob)
+매 반복에 dW,dB를 계산하고 
+Sdw=a*Sdw+(1-a)dw^2(요소 전체의 제곱)
+Sdb=a*Sdb+(1-a)*dB^2을 계산해
+W=W-q*dw/Sdw^1/2로 업데이트하며 b역시도 동일하게 update
+
+진동을 폭을 줄이는게 목적,따라서 더큰 학습률을 사용가능하게됨
+
+sdw가 0에 가깝지 않다는거 구현하기위해 Sdw^1/2+엡실론으로 나눠야한다.10^-8정도
+
+Adam optimization algorithm
+Vdw=0,Sdw=0,Vdb=0,Sdb=0
+로 초기화, compute dW,db를 매 반복마다 minibatch에서 구하고 Vdw=aVdw+(1-a)dw로 Vdb도 동일하게 구함
+Sdw=cSdw+(1-c)dW^2(각 요소들의 제곱, dW^2[i][j]=(dW[i][j])^2)으로, Sdb도 동일하게 구함
+Vdw=Vdw/(1-a^t)
+Sdw=Sdw(1-c^t),db에 대해서도 ㄱ하고 최종적으로 W=W-q*Vdw/Sdw^1/2+e
+로,b도 동일하게 update
+
+learning rate decay(학습률감소)
+처음엔 크게,나중엔 작게하기위해
+(위의 W-q*Vdw..에서의 q이다.)
+1.q=q0/1+decayrate*epochnum으로 설정하는것(decayrate는 설정하는거고 epochnum은 학습 데이터 넘버링값)
+예제에선 decay-rate를 1로,q0=0.2 하고있음
+
+부분최적값 문제(부분최적해에 갇히는 문제)
+매개변수 수가 클수록 local optima에 갇힐 확률은 낮다. 대신 안장점인 경우가 많을것. 안장점인 경우 obsilation에 의해 벗어나게 된다. 그래도 안장점에서 학습이 느려지기에 adam등이 쓰이는것.
+
+3주차 hyperparameter tuning부터
+
