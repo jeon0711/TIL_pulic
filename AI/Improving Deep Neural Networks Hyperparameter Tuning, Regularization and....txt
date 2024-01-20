@@ -117,3 +117,56 @@ mini batch에서 X[1]으로 Z를 구해 정규화하는 동안 어차피 B[l]은
 
 배치정규화는 배치하나를 처리하지만 테스트시에는 그렇지 않으므로 좀 다르게 할 필요가 있음. 
 지수가중평균으로 미니배치들에서의 평균과 표준편차로 평균과 표준편차를 추정해간다. 테스트시에는 학습완료시의 이 지수가중평균으로 구한 평균과 표준편차로 계산한다.
+
+softmax regression
+로지스틱 회귀의 일반화
+logistic regression에서 이진분류가 아니라 다수분류
+C=number of class
+마지막 판정을 하는 layer의 노드수는 일반적으로 C와 같다 각각이 해당 클래스인지 판정하는거
+
+softmax activation function
+e^z[l]/sumof(e^z[l])
+최대 우도 추정법맞다
+
+이하는 복습
+
+logistic regression
+선형 모델로 만들고, p(X)=e^f/1+e^f.
+odd=pX/1-pX=e^f,p일 확률/아닐확률=e^f가 되도록 f를 정한다.
+p를 알때 e^f를 결정할수 있는것.
+px를 안다면 log(px/1-px)=f(x)가 되도록 f정한다.
+선형비례관계는 아니지만, 비례관계가 존재하면 이를 표현할수 있다.
+maximize likelihood function(a,b)=(yi=1이면 px,아니면 1-px의 곱들.)이다. 곱하는거맞다. 특별한 가정이 들어가면 rss되는것.
+최대화한 거 구하는 수학적 디테일은 여기서는 넘어감.
+a,b는 f가 선형일때 a는 계수벡터,b는 상수값이다.
+최대화하는 a,b를 구했다면, a,b가 모수일떄 a,b는 무선적으로 추출한 데이터셋에서 결정되는,최대화하는 a,b값이 되며, 이값들을 무선적으로 표본추출해서 나오는 표본평균들로 만든 분포로 검정을 하는거다.
+
+likelihood(우도,가능도)함수는 입력이 모집단을 생성할때, 이 모집단일때 현재 표본이 나올 확률이다. 현재 표본이 나올 확률이 높은 모집단을 고르는것으로 추정하기 위해 사용되며, 총합이 1일지는 모르겠다 즉 모집단의 확률은 아님.베이의 추정법으로 likelihood에서 모집단의 확률 구할수 있는 경우도 있다.
+
+z분포구해서 H0:w=0 인지 본다.
+p-값은 영가설을 잘못기각하는 결론으로 이끌 확률이다.
+ 
+단순 다수인자인경우 위의 방법을 쓰면 되지만, 결과값 y가 여럿인경우
+pr(yk|X)=sum(e^f(w(k),x))/1+sum(k=1~N-1,sum(e^f(w(k),x)))
+log(pr(yk|x)/pr(y=K|x))=f(w(k),x)이다.
+y=n일때는 분자가 1이며 전부 아닌경우를 의미한다.
+각 y들은 배반사건이라는것 명심. y=n에서 n을 기준으로 할 사건으로 정해도 된다.
+이경우 p(y=k|x=x)=e^f(k)/sum(k=1~N,sum(e^f(w(k),x)))
+그냥 N까지 더하면됨.
+이러면 log(Pr(y=k|X=x)/Pr(y=m)|X=x)=f(w(k)-w(m),x)가 되므로 편함.
+
+복습끝
+각a[l]=e^z[l]/sumof(e^z[l])
+이 값들중 가장 큰값을 선택한다.
+
+hardmax는 값이 이진수로 떨어져서 인듯
+
+how train
+L(y^,y)=-sumof(yjlogy^j)로 계산한다. y^은 1이하의 수이고 yj는 1아니면 0이므로 -log(y^j)가 되고 lossfunction의 최소화는 y^j의 최대화(yhat을 y^로 표기,예측값의미)
+J=sumof(L(yj^,yj))/m이된다.
+
+backprop의 dz[l]=yhat-y가 된다(dJ/dz=dz[l]표기)
+그럴려고 lossfunction을 저렇게 정한거임.
+
+deeplearning frameworks
+opensource로 남을 framework골라라
