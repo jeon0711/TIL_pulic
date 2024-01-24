@@ -167,6 +167,3 @@ J=sumof(L(yj^,yj))/m이된다.
 
 backprop의 dz[l]=yhat-y가 된다(dJ/dz=dz[l]표기)
 그럴려고 lossfunction을 저렇게 정한거임.
-
-deeplearning frameworks
-opensource로 남을 framework골라라
