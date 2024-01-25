@@ -106,7 +106,7 @@ struct dirent {
   off_t d_offset;             // offset to the next dirent
   unsigned short d_recordlen; // length of this record
   unsigned char d_type;    // type of file
-};(이정보가 directoriy에 보관됨)
+};
 
 link() creates a new name in the directory and refers it to the same inode number as the original file.
 
