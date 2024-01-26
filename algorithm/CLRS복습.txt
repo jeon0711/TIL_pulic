@@ -109,7 +109,6 @@ dp[a][b]=dp[a-1][b-1]+Qc||
 dp[a-2][b-2]+Qt||dp[a-1][b]+Qd||
 dp[a][b-1]+Qi||dp[a-1][b-1]+Qr이다.
 
-b.copy=1,replace=-1,로 insert=-2 그리고 짧은쪽에서만 insert하게하면 되는거 아닌가?
 
 14.6
 사람 각각에 rank,이 rank의 최대화, 단 직속상사나 부하가 만나지 않아야함.
