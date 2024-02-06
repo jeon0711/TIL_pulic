@@ -37,3 +37,79 @@ Mocha가 이러한 "known flags"를 감지하면, Mocha는 Node.js를 자식 프
 최종 요약/에필로그 출력: 해당하는 경우, Mocha는 최종 요약이나 에필로그를 출력합니다.
 
 글로벌 종료 픽스처 실행: 설정된 글로벌 종료 픽스처가 있으면 실행합니다. 
+
+set 함수는 HTTP 요청을 수행할 때 사용되며, 주로 요청 헤더를 설정하는 데 사용됩니다. 위의 코드 예제에서 set 함수는 authorization 헤더를 설정하여 HTTP 요청에 포함시키고 있습니다. Bearer testtokerrn 값은 일반적으로 JWT(JSON Web Tokens) 또는 다른 형태의 토큰을 사용한 인증 방식에서 사용됩니다. 이는 서버가 요청을 처리하기 전에 사용자의 인증 정보를 확인할 수 있게 해줍니다.
+
+set 함수의 사용 조건 및 기능:
+기능: 요청 헤더를 설정합니다. set 함수는 첫 번째 매개변수로 헤더의 이름을, 두 번째 매개변수로 헤더의 값을 받습니다. 이를 통해 HTTP 요청에 필요한 추가 정보를 서버에 전달할 수 있습니다.
+
+사용 조건:
+
+인증 요구: 서버가 요청을 처리하기 위해 사용자 인증이 필요한 경우, 예를 들어 토큰 기반 인증에서는 Authorization 헤더를 통해 인증 토큰을 전달해야 합니다.
+컨텐츠 타입 설정: 클라이언트가 서버에 데이터를 전송할 때, 데이터의 형식을 명시하기 위해 Content-Type 헤더를 설정할 수 있습니다. 예를 들어 JSON 형식의 데이터를 전송하는 경우 application/json을 값으로 설정합니다.
+기타 헤더 설정: 다양한 HTTP 헤더들을 설정할 수 있습니다. 예를 들어, 요청의 출처를 명시하기 위해 Referer 헤더를, 또는 캐싱 정책을 제어하기 위해 Cache-Control 헤더를 설정할 수 있습니다.
+
+send 함수는 HTTP 요청을 수행할 때 요청 본문(body)에 데이터를 첨부하기 위해 사용됩니다. 이 함수는 클라이언트가 서버로 데이터를 전송하고자 할 때 필수적으로 사용되며, GET 요청을 제외한 POST, PUT, PATCH, DELETE 등의 HTTP 메서드에서 주로 사용됩니다.
+
+send 함수의 기능:
+데이터 전송: 클라이언트에서 서버로 데이터를 전송하고자 할 때, 해당 데이터를 요청 본문에 첨부합니다. send 함수는 문자열, 객체, 또는 배열 등 다양한 데이터 타입을 지원합니다.
+컨텐츠 타입 자동 설정: send 함수를 사용하여 JSON 객체를 전송하는 경우, 대부분의 HTTP 클라이언트 라이브러리는 자동으로 Content-Type 헤더를 application/json으로 설정합니다. 이는 서버가 요청을 적절히 해석할 수 있게 해줍니다.
+사용 조건:
+데이터 전송 필요성: 클라이언트가 서버에 데이터를 전송하고자 하는 모든 상황에서 사용됩니다. 예를 들어, 사용자가 폼에 입력한 데이터를 서버로 전송하거나, 데이터베이스에 저장할 새로운 리소스를 생성할 때입니다.
+HTTP 메서드: GET 요청을 제외한 대부분의 HTTP 메서드에서 사용할 수 있습니다. GET 요청은 URL의 일부로 데이터를 전송하기 때문에 send 함수를 사용하지 않습니다.
+
+done은 비동기 테스트 함수 인자로 줘서 작업이 끝났을때 done()을 호출해 비동기 작업 끝났을음 알림.
+
+Supertest의 비동기 요청이 완료된 후 결과를 검증하기 위해 .end 메서드가 사용됩니다. .end 메서드는 요청이 완료되었을 때 실행되는 콜백 함수를 인자로 받으며, 이 콜백 함수 내에서 비동기 작업이 완료되었음을 done() 호출로 테스트 프레임워크에 알립니다.
+
+코드 내에서 done() 함수의 호출은 비동기 테스트가 종료되었음을 나타내며, 모든 비동기 작업이 완료되고 테스트 검증이 끝난 후에 호출되어야 합니다. 이 콜백 함수 내에서 발생한 오류는 테스트 실패로 이어질 수 있으며, done()이 호출되지 않으면 테스트는 타임아웃 오류로 실패할 것입니다.
+
+만약 프로미스나 async/await 패턴을 사용하는 비동기 테스트를 선호한다면, Supertest의 요청을 프로미스로 처리하고 async/await 구문을 사용하여 테스트의 가독성과 유지 관리성을 향상시킬 수 있습니다. 이 경우 done 콜백은 필요하지 않습니다. 예를 들어:
+
+javascript
+Copy code
+it('응답으로 404를 반환해야 함', async () => {
+    const res = await request(app)
+        .delete('/review/reply/10700')
+        .set("authorization", "Bearer testtoken")
+        .expect(404);
+    // res.body 또는 다른 부분을 검증하는 코드를 여기에 추가할 수 있습니다.
+});
+이 예제에서는 async/await를 사용하여 비동기 요청을 보내고, expect를 통해 응답을 검증하며, 이 모든 과정을 비동기적으로 처리합니다. 따라서, .end 메서드를 사용하지 않고도 응답을 검증할 수 있으며, 테스트 코드의 실행 흐름을 더 명확하게 관리할 수 있습니다.
+
+refresh token관련
+The user opens the app and provides his login credentials. Now, most probably the app is interacting with a REST backend service. REST is stateless, there isn't a way to authorize access to the APIs. Hence, so far in the discussion, there is no way to check if an authorized user is accessing the APIs or is just some random requests coming through.
+
+Now to be able to solve this problem, we need a way to know that the requests are coming from an authorized user. So, what we did was to introduce something called an access token. So now once the user is authenticated successfully, he is issued an access token. This token is supposed to be a long and highly random token (to ensure that it can not be guessed). This is where the JWT comes into the picture. Now you may/may not want to store any user-specific details in a JWT token. Ideally, you would want to just store very simple, extremely non-sensitive details in the JWT. The manipulation of the JWT hash to retrieve other user's details (IDOR etc.) is taken care of by JWT (the library being used) itself.
+
+So, for now, our problem with authorized access is solved.
+
+Now we talk of an attack scenario. Let's say using all of the above user Alice, using the app, has the authorized access token and now her app can make requests to all the APIs and retrieve the data as per her authorization.
+
+Assume that SOMEHOW Alice loses the Access Token or put another way, an adversary, Bob, gets access to Alice's access token. Now Bob, despite being unauthorized, can make requests to all the APIs that Alice was authorized to.
+
+SOMETHING WE IDEALLY DON'T WANT.
+
+Now the solution to this problem is :
+
+Either detect that there is something of this sort happening.
+Reduce the attack window itself.
+Using just the access token alone, it is hard to achieve condition 1 above, because be it Alice or Bob, it's the same authorized token being used and hence requests form the two users are not distinguishable.
+
+So we try achieving 2 above and hence we add an expiration to the validity of the access token, say the access token is valid for 't' (short-lived) time.
+
+How does it help? Well, even if Bob has the access token, he can use it only while it is valid. As soon as it expires, he will have to retrieve it again. Now, of course, you could say that he can get it the same way he got it the first time. But then again there's nothing like 100% security!
+
+The above approach still has a problem and in some cases an unacceptable one. When the access token expires, it would require the user to enter his login credentials and obtain an authorized access token again, which at least in case of mobile apps, is a bad (not acceptable) user experience.
+
+Solution: This is where the refresh token comes in. It is again a random unpredictable token that is also issued to the app along with the access token in the first place. This refresh token is a very long-lived special token, which makes sure that as soon as the access token expires, it requests the server for a new access token, thus removing the need for the user to re-enter his login credentials to retrieve a new authorized access token, once an existing one has expired.
+
+Now you may ask, Bob can have access to the refresh token as well, similar to the way he compromised the access token. YES. He can. However, now it becomes easy to identify such an incidence, which was not possible in the case of an access token alone, and take the necessary action to reduce the damage done.
+
+How?
+
+For every authenticated user (in case of a mobile app, generally), a one to one mapped refresh token and access token pair is issued to the app. So at any given point in time, for a single authenticated user, there will be only one access token corresponding to a refresh token. Now assume that if Bob has compromised the refresh token, he would be using it to generate an access token (because access token is the only thing which is authorized to access resources through the APIs). As soon as Bob (attacker) requests with the newly generated access token because Alice's (genuine user) access token is still valid, the server would see this as an anomaly, because for a single refresh token there can be only one authorized access token at a time. Identifying the anomaly, the server would destroy the refresh token in question and along with it all, it's associated access tokens will also get invalidated. Thus preventing any further access, genuine or malicious, to any authorization requiring resources. The user, Alice, would be required to once again authenticate with her credentials and fetch a valid pair of a refresh and access tokens.
+
+Of course, you could still argue that Bob could once again get access to both refresh and access tokens and repeat the entire story above, potentially leading to a DoS on Alice, the actual genuine customer, but then again there is nothing like 100% security.
+
+Also as a good practice, the refresh token should have an expiry, although a pretty long one.

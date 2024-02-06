@@ -134,3 +134,72 @@ Processes can use lseek() to modify the current offset, allowing random access t
 A process must use fsync() or similar functions to update persistent data. However, doing so correctly while keeping high performance is difficult.
 You can use hard links or symbolic links to have several human-readable names point to the same underlying file. Consider their strengths and disadvantages before using them. Remember that removing a file only unlinks it from the directory hierarchy.
 Most file systems allow you to turn sharing on and off. Permissions bits give a basic method for these controls. Access control lists provide more precise control over who can access and change data.
+
+crash sinario는
+data block,inode,bitmap중 하나,둘만 써지고 나머지는 실패할 수 있다. 
+
+Superblock: fsck checks the superblock by comparing the file system size to the allotted blocks. Finding corrupt superblocks is the goal. In this case, the system (or administrator) can use a backup superblock.
+Free blocks: Then fsck traverses the inodes, indirect blocks, double indirect blocks, etc. to determine the file system’s current block allocation. It relies on inode information to produce correct allocation bitmaps, thus any discrepancy between bitmaps and inodes is addressed. Also, all inodes are checked for use in the inode bitmaps.
+Inode state: Every inode is checked for damage. For example: fsck checks each inode’s type field (e.g., regular file, directory, symbolic link, etc.). Unresolved inode field issues are dealt with by fsck and the inode bitmap is refreshed.
+Inode links: fsck counts the links in each inode. A folder reference (or link) counts the number of folders that contain a file reference (or link). Each file and directory in the file system has its own link count, which is validated by fsck. It is necessary to fix the inode count if the newly calculated count does not match. An allocated inode is moved to the lost+found directory when it is discovered.
+Duplicates: fsck checks for duplicate block references in inodes. Delete an obvious defective inode. Cloning the pointed-to block would provide each inode its own copy.
+Bad blocks: Faulty block pointers are detected while scanning the pointer list. An address larger than the partition size is considered “bad”. fsck simply removes the pointer from the inode or indirect block.
+Directory checks: fsck doesn’t understand user files, but directories contain file system information. For each directory entry, fsck ensures that the inode referenced is allocated, and that no directory is linked to more than once in the hierarchy.
+
+Scanning a huge disk volume to find all allocated blocks and read the directory tree may take minutes or hours. fsck performance became prohibitive as disk size and RAID adoption expanded (despite recent enhancements).
+
+Write-ahead logging, or journaling
+
+With write-ahead logging, before an update is made on the disk, a note is made somewhere else on the disk stating what is about to happen.
+If a crash happens during a structure overwrite, instead of scanning the entire disk, you can just refer to the note you wrote and try again. Journaling adds work during updates to reduce recovery effort.
+
+With Linux ext3, a well known journaling file system, the disk is separated into block groups, and each block group has an inode bitmap, data bitmap, inodes, and data blocks. The new key structure is the journal, which takes up little space in the partition or elsewhere.
+
+Five blocks are used here. TxB contains the final addresses of blocks I[v2], B[v2], and Db (the pending file system update) and a transaction identifier (TID).
+
+Then comes physical logging, three blocks of the update’s specific physical content. The last block (TxE) carries the transaction ID.
+
+Once this transaction is safely placed on disk, we checkpoint the file system and overwrite the existing structures. To do this, we write I[v2], B[v2], and Db to disk. So our initial operation sequence is:
+Journal write: Write the transaction to the log, including a transaction-begin block, all pending data and metadata modifications, and a transaction-end block.
+Checkpoint: Update the pending information and data in the file system.
+
+We start with TxB, I[v2], B[v2], Db, and TxE. After these writes, we checkpoint I[v2], B[v2], and Db to their ultimate destinations on disk.
+
+It uses two-step transactional writing to avoid this. It first writes all blocks except TxE to the journal. The diary will then look like this (if we keep appending):
+After that, the file system writes the TxE block, leaving the journal in this safe state:
+
+A file system can use the journal to recover from a crash.
+If the crash happens before the transaction is successfully logged, the pending update is skipped.
+
+It is possible to recover updates if the file system crashes after the transaction commits but before the checkpoint.
+
+The journal superblock stores enough information to identify which transactions have not yet been checkpointed. This allows for faster recovery and cyclic log usage.
+We’ll add another step to our protocol:
+Journal write: Write the contents of the transaction (TxB and the update) to the log.
+Journal commit: Write the transaction commit block (TxE) to the log; wait for it to finish.
+Checkpoint: Update the file system content to their final destinations.
+Free: Update the journal superblock to label the transaction free.
+
+Unlike metadata journaling, ordered journaling does not write user data to the notebook
+
+For metadata-only journaling, the data blocks should be written first.
+File systems like Linux ext3 write data blocks before metadata. The protocol is as follows:
+Data write: At final location, write data; wait for completion (waiting is optional; details below).
+Journal metadata write: Write the begin block and metadata to the log; wait for writes to complete.
+Journal commit: Write the transaction commit block (including TxE) to the log; wait for the write to finish.
+Checkpoint metadata: Write the metadata update to its final file system location.
+Free: Later, mark the transaction free in journal superblock.
+
+Soft Updates are another way to maintain metadata consistency. For example, it writes a pointed-to data block to disk before the inode that points to it, so the inode never points to garbage.
+
+Copy-on-write (COW) is also utilized in several file systems, notably Sun’s ZFS. Not overwriting existing files or directories, but simply updating unused storage space. The COW file system updates the root structure with fresh structure references.
+
+Backpointer-based consistency (BBC) is another method. Writing is not ordered. Every block in the system gets a back pointer. The file system can tell if a file is consistent by looking at the forward pointer, or address in the inode or direct block. If so, everything has reached disk safely, and the file is consistent; if not, an error is returned.
+
+With an extended form of the transaction checksum and a few other techniques, the optimistic crash consistency strategy issues as many writes to disk as possible while detecting discrepancies.
+
+We introduced the issue of crash consistency and a few of its possible solutions.
+On newer computers, the earlier way of generating a file system checker may be too slow. So journaling is now widely used.
+In short, journaling reduces recovery time from O(disk volume size) to O(log volume size), greatly speeding up post-crash recovery.
+Journaling can take several forms; the most common is ordered metadata journaling, which minimizes traffic to the journal while maintaining sufficient consistency guarantees for both file system information and user data.
+Solid user data guarantees are undoubtedly one of the most critical things to provide; however, recent research shows that this field is still evolving.

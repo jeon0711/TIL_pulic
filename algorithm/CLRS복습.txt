@@ -126,3 +126,16 @@ c.dp[i][j]를 i번이 이전투자,j번을 이번년도 투자처로 두고 총 
 dp[k][j]k달에 j개가 남개하는 최소비용
 15.12
 dp[a][b]=a포지션까지 b달러를 사용해 만드는 최대의 vorp를 리턴
+
+
+16.1
+활동선택문제
+ai~aj에서 활동집합을 Sij라 하고
+Sij에 들어있는 상호양립가능한 최대크기의 집합
+Aij,Aij가 ak를 포함한다고 하자
+ak를 기준으로 Sik,Skj로 Sij를 분할하고
+Aik=Aij^Sik라 하면(가정)
+Aij=AikVakVAkj
+2.|Aij|=|Aik|+1+|Akj|가 된다
+(Aij^Sij=Aij=Aij^(Sik+ak+Skj))이므로 당연진술이다
+이때 만약 Aik'>Aik인 Aik'이 존재하면 Aij의 값 자체가 커지므로 Aij가 최적해라는 가정에 어긋나므로 Aik=Aij^Sik이다.
