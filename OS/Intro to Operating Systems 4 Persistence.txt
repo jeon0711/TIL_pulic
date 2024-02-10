@@ -203,3 +203,192 @@ On newer computers, the earlier way of generating a file system checker may be t
 In short, journaling reduces recovery time from O(disk volume size) to O(log volume size), greatly speeding up post-crash recovery.
 Journaling can take several forms; the most common is ordered metadata journaling, which minimizes traffic to the journal while maintaining sufficient consistency guarantees for both file system information and user data.
 Solid user data guarantees are undoubtedly one of the most critical things to provide; however, recent research shows that this field is still evolving.
+
+The log-structured file system was created due to the following observations:
+System memory expansion
+The performance gap between random and sequential I/O is large
+File systems perform badly on several typical tasks
+File systems are not aware of RAIDs
+
+LFS, or Log-structured File System, buffers and writes all changes (including metadata) into an in-memory segment. This segment is written to disk in one continuous sequential transfer to an unused section of the disk.
+
+LFS uses a technique called write buffering to keep track of updates in memory before writing them to disk. This guarantees efficient disk usage.
+
+The huge batch of changes is called a segment. A segment, here, is a relatively large chunk utilized by LFS to aggregate writes.
+
+When writing to disk, LFS buffers the updates in memory and writes the segment all at once.
+
+어느정도의 데이터를 모아서 보내는게 효율적인지에 대한 연산. Rpeak과 Tposition은 고정값이므로 효율이 일정 이상이게 하기위한 D의 값을 구하는거다.
+
+To find an inode in a normal UNIX file system or a system like FFS, inodes are structured in an array and placed in defined positions on disk.
+This is more difficult in LFS because we’ve spread the inodes around the disk, and we never overwrite in place, so the desired inode keeps shifting.
+
+LFS designers created a. level of indirection and a data structure called an inode map (imap). This structure takes an inode number as input and returns the most recent version’s disk address. It’s commonly implemented as a 4-byte array (a disk pointer). When an inode is written to disk, the imap is updated.
+
+inode 맵은 파일 시스템의 구조 중 하나로, 리눅스 및 UNIX 계열 운영 시스템에서 파일의 메타데이터를 저장하는 데 사용됩니다. inode는 "index node"의 약자로, 파일 시스템 내 각 파일과 디렉토리에 대한 정보를 담고 있는 데이터 구조입니다. inode 맵은 이러한 inode들의 위치와 사용 여부를 추적하는 데 도움을 줍니다.
+
+inode에는 파일의 소유자, 파일 권한, 파일 크기, 파일이 생성, 수정, 접근된 시간 등의 메타데이터와 파일 데이터가 저장되는 디스크 상의 위치 정보가 포함됩니다. 하지만 inode에는 파일 이름이 저장되지 않습니다. 파일 이름과 inode 번호는 디렉토리 엔트리에 저장되어, 파일 이름을 통해 해당 파일의 inode 정보에 접근할 수 있게 합니다.
+
+inode 맵은 파일 시스템을 초기화할 때 생성되며, 각 inode에는 고유한 번호가 할당됩니다. 파일 시스템이 파일이나 디렉토리에 접근할 때, 해당 inode 번호를 사용하여 필요한 메타데이터와 파일 데이터의 위치를 빠르게 찾을 수 있습니다. 이 구조 덕분에 리눅스 및 유닉스 기반 시스템은 효율적인 파일 관리와 빠른 접근 속도를 제공할 수 있습니다.
+
+inode 맵의 중요한 특징 중 하나는 고정된 크기를 갖는다는 것입니다. 이는 파일 시스템 내에 생성할 수 있는 파일과 디렉토리의 최대 개수를 제한합니다. 시스템이 많은 수의 작은 파일을 다룰 경우, inode 부족 현상이 발생할 수 있으며, 이는 파일 시스템의 확장이나 재구성을 필요로 할 수 있습니다.
+
+inode 맵과 inode 구조는 리눅스와 유닉스 파일 시스템의 핵심 요소로, 효율적인 파일 관리와 시스템의 안정성을 보장하는 데 중요한 역할을 합니다.
+
+Due to the inode map being fragmented over the disk, a file lookup requires a fixed and known location on disk.
+This fixed location is known as the checkpoint region (CR) in LFS. The latest inode map parts are found by first reading the CR. The checkpoint region is only updated every 30
+ seconds or so. A checkpoint region points to the newest portions of the imap. The imap contains addresses of inodes, which lead to files (and directories) like ordinary UNIX file systems.
+
+메모리가 없는 상태에서 디스크에서 파일을 읽는 과정을 살펴보겠습니다. 체크포인트 영역은 먼저 읽혀지는 첫 번째 온디스크 데이터 구조로, 전체 inode 맵에 대한 포인터를 포함하고 있어, LFS(Log-structured File System)는 전체 imap(inode map)을 읽어 메모리에 캐시합니다.
+
+파일의 inode 번호는 LFS에 의해 읽혀지며, LFS는 imap에서 inode 번호를 디스크 주소 매핑으로 조회하고 가장 최근 버전을 읽습니다.
+
+파일에서 블록을 읽기 위해, LFS는 필요에 따라 직접 포인터, 간접 포인터, 또는 이중 간접 포인터를 사용합니다.
+
+이 과정은 파일 시스템이 디스크에서 데이터를 효율적으로 검색하고 읽는 방법을 설명합니다. 체크포인트 영역에서 시작하여 필요한 데이터 구조와 파일의 실제 데이터에 접근하기까지의 단계를 포함합니다. 이러한 메커니즘은 파일 시스템의 성능과 안정성을 보장하는 데 중요한 역할을 합니다.
+
+
+파일에 접근할 때, 일부 디렉토리도 열어야 합니다. 디렉토리 구조는 고대 UNIX 파일 시스템에서와 매우 유사하며, 이름과 inode 번호의 매핑을 포함합니다. 예를 들어, 파일을 생성할 때 LFS(Log-structured File System)는 새로운 inode, 일부 데이터, 파일의 디렉토리 데이터 및 inode를 작성해야 합니다. LFS는 일정 시간 동안 업데이트를 버퍼링 한 후 순차적으로 이를 수행합니다. 이는 디스크에 다음과 같은 새로운 구조를 결과로 낳습니다:
+
+inode 맵은 디렉토리 파일 dir과 새로 생성된 파일 f에 대한 정보를 제공합니다. 이 예에서, 먼저 inode 맵에서 디렉토리 inode A3을 검색하고(일반적으로 RAM에 캐시됨), 디렉토리 inode를 읽어 디렉토리 데이터(A2)를 찾고, 이 데이터 블록을 읽어 파일 test의 이름-인덱스 번호 매핑(test, k)을 얻습니다. 그런 다음 inode 맵에서 inode k(A1)를 조회하고, 마지막으로 원하는 데이터 블록을 주소 A0에서 읽습니다.
+
+inode 맵은 또한 LFS의 또 다른 중요한 문제인 재귀적 업데이트 문제를 해결합니다. 디스크의 새 위치로 업데이트를 전송하는 모든 파일 시스템(LFS와 같은)에서 이 문제가 존재합니다.
+
+LFS는 inode 맵을 사용하여 파일에 해당하는 디렉토리를 업데이트하는 것을 피합니다. inode의 위치가 변경되더라도 디렉토리의 imap 구조는 변경되지 않습니다. LFS는 간접 참조를 통해 재귀적 업데이트 문제를 회피합니다.
+
+LFS(Log-structured File System)와 관련된 문제 중 하나는 디스크 전체에 오래된 파일 구조 버전을 흩어지게 한다는 것입니다.
+
+inode 번호 k로 참조된 파일을 고려해 보겠습니다. 이 파일은 단일 데이터 블록 D0에 연결됩니다. 새로운 inode와 데이터 블록이 생성될 때마다, 이전 블록을 업데이트합니다. (참고: 간단히 하기 위해, imap 및 기타 구조체는 생략하고, 새로운 inode를 참조하기 위해 디스크에 새로운 imap 조각을 작성해야 합니다.):
+
+도표에서 볼 수 있듯이, inode와 데이터 블록에는 디스크 상에 두 버전이 있습니다. 하나는 오래된 것(왼쪽)이고 다른 하나는 현재 및 활성 상태인 것(오른쪽)입니다. 데이터 블록을 논리적으로 변경함으로써, LFS는 새로운 구조를 유지하고 오래된 버전을 디스크에 남겨둬야 합니다.
+
+대신 원래 파일 k에 블록을 추가한다고 가정해 봅시다. inode는 다시 생성되지만, 여전히 원래 데이터 블록을 가리킵니다. 따라서 여전히 거기에 있고 현재 파일 시스템의 일부입니다:
+
+LFS는 주기적으로 오래되고 사용되지 않는 파일 데이터, inode 및 기타 구조체의 오래된 버전을 찾아 청소하여 나중에 쓰기 위한 디스크 블록을 확보합니다. 청소는 가비지 컬렉션의 한 형태로, 컴퓨터 언어에서 메모리를 자동으로 확보하는 데 사용됩니다.
+
+큰 쓰기를 디스크에 허용하는 메커니즘으로서 세그먼트는 성공적인 청소에 필수적입니다.
+
+세그먼트를 사용하여 청소를 하면 시스템이 할당된 공간과 섞인 자유 공간의 구멍을 피할 수 있습니다.
+
+록의 생존 여부를 결정하기 위해, LFS(Log-structured File System)는 각 세그먼트 블록에 약간의 추가 정보를 포함합니다. 이 정보에는 각 데이터 블록에 대한 inode 번호와 오프셋이 포함됩니다. 이 데이터는 세그먼트의 머리 부분에 위치한 세그먼트 요약 블록에 저장됩니다.
+
+블록의 상태를 결정하는 것은 주소 A에서 블록 D의 inode 번호(N)와 오프셋(T)을 찾는 것으로 시작됩니다. 다음으로, imap에서 N을 찾아 디스크나 메모리에서 읽습니다. 마지막으로, 오프셋 T를 사용하여 디스크에서 파일의 T번째 블록을 찾습니다. LFS는 블록 D가 디스크 주소 A에 연결되어 있으면 블록 D가 생존해 있음을 결정할 수 있습니다. 다른 곳을 가리키면 LFS는 D가 더 이상 필요하지 않으며 이 버전이 죽었다는 것을 알 수 있습니다. 다음은 의사 코드 요약입니다:
+(N, T) = SegmentSummary[A];
+inode = Read(imap[N]);
+if (inode[T] == A)
+// 블록 D는 생존해 있음
+else
+// 블록 D는 쓰레기임
+
+세그먼트 요약 블록(SS)은 주소 A0에 있는 데이터 블록이 실제로 파일 k의 오프셋 0의 일부분임을 기록합니다. k에 대한 imap을 확인함으로써 inode를 찾을 수 있습니다.
+
+LFS는 생존 여부 결정 절차를 가속화하기 위해 여러 단축 방법을 사용합니다. 파일이 파괴될 때, LFS는 버전 번호를 증가시키고 imap를 업데이트합니다. 디스크 상의 버전 번호와 imap 버전 번호를 비교함으로써, LFS는 불필요한 읽기를 방지하고 위에 설명된 긴 검사를 우회할 수 있습니다. LFS는 세그먼트에 쓰기를 버퍼링한 다음, 세그먼트가 가득 차거나 일정 시간이 지나면 세그먼트를 디스크에 씁니다.
+
+LFS는 이 쓰기들을 로그에 조직하며, 헤드와 꼬리 세그먼트를 가리키고 각 세그먼트가 다음에 쓸 세그먼트를 가리킵니다.
+
+LFS가 세그먼트나 CR(Checkpoint Region)에 쓰는 동안 충돌이 발생할 수 있습니다.
+
+세그먼트에 쓰기 중 충돌이 발생하면 데이터 손실을 최소화하기 위해 LFS는 디스크 양쪽 끝에 CR을 두 개 유지하고 번갈아 가며 업데이트를 수행하여 원자적인 CR 업데이트를 보장합니다.
+
+LFS는 새로운 inode 맵 포인터와 기타 데이터를 CR에 업데이트하는 엄격한 프로토콜을 사용합니다; 헤더(타임스탬프 포함), 그 다음 본문, 그리고 마지막으로 하나의 블록(또한 타임스탬프 포함)을 내보냅니다.
+
+LFS는 CR 업데이트 중 시스템 충돌을 타임스탬프의 일관성 없는 쌍을 통해 식별할 수 있습니다. LFS는 일관된 타임스탬프를 가진 가장 최근의 CR을 항상 사용할 것입니다.
+
+LFS가 CR에 쓰는 동안 충돌이 발생하고 LFS가 다시 시작되면, LFS는 체크포인트 영역, 그것이 가리키는 imap 조각, 그리고 아직 읽지 않은 모든 파일이나 디렉토리를 읽을 것입니다.
+
+LFS는 "롤 포워드"라고 불리는 데이터베이스 접근 방식을 사용하여 많은 세그먼트를 재구성하려고 시도합니다.
+
+이 접근 방식은 마지막 체크포인트 영역을 사용하여 로그의 끝을 결정하고, 그것을 사용하여 다음 세그먼트를 검색하며 유효한 업데이트를 찾습니다. LFS는 마지막 체크포인트 이후에 작성된 많은 데이터와 메타데이터를 복구할 수 있습니다.
+
+LFS(Log-structured File System)는 디스크 업데이트를 수정합니다. LFS는 항상 디스크의 사용되지 않은 부분에 쓰고 나중에 그것을 청소합니다. LFS는 모든 업데이트를 메모리 내 세그먼트로 그룹화하고 순차적으로 쓰는 방식으로 효율적으로 쓸 수 있습니다.
+
+LFS의 대규모 쓰기는 많은 장치에서 빠릅니다. RAID-4와 RAID-5와 같은 패리티 기반 RAID에서는 대규모 쓰기가 작은 쓰기 문제를 제거합니다. 고성능을 위해 플래시 기반 SSD에서는 큰 I/O가 필요하므로, LFS 스타일의 파일 시스템이 적합할 수 있습니다.
+
+이 절차는 폐기물(즉, 오래된 데이터 사본이 디스크 주변에 퍼져 있으며, 이러한 공간을 미래 사용을 위해 회수하려면 주기적으로 오래된 세그먼트를 청소해야 함)을 생산합니다. 청소 비용에 대한 우려는 LFS의 초기 영향을 제한했을 수 있습니다.
+
+NetApp의 WAFL, Sun의 ZFS, Linux btrfs 및 심지어 더 새로운 플래시 기반 SSD와 같은 최근 상용 파일 시스템은 LFS의 개념적 유산을 이어받았습니다. 파일 시스템의 스냅샷을 제공함으로써, 사용자는 실수로 새 파일을 삭제한 경우 오래된 파일에 접근할 수 있습니다.
+
+Flash, which we will explore here, has certain unique properties:
+to write to a flash page, you must first erase a larger piece called a flash block, which might be costly and
+writing on a page too often will wear it out.
+
+Each transistor in a flash chip stores one or more binary values mapped to the level of charge trapped therein. There are different types of cells:
+single-level cells (SLC): storing only a single bit (i.e., 1 or 0). These chips are faster and more expensive.
+multi-level cells(MLC): storing two bits having differing levels of charge (e.g., 00, 01, 10, and 11 are representing low, somewhat low, somewhat high, and high levels respectively), and
+triple-level cells (TLC): storing 3 bits per cell.
+Flash chips are grouped into large banks or planes of cells.
+In a bank, data is accessed in two sizes: blocks (sometimes called erase blocks) of 128 KB or more, and pages of a few KB (e.g., 4KB).
+
+Each bank has several blocks, and each block has many pages. With flash, blocks and pages are distinct from disk blocks, RAID blocks, and virtual memory pages.
+
+With this flash arrangement, a flash chip can handle three low-level processes:
+Read a page: A flash chip client can read any page by sending the read instruction and the appropriate page number.
+This action is often very quick, tens of microseconds or less, regardless of device location or previous request location. This being a random access device it can swiftly access any place.
+Erase a block: Before writing to a page in a flash, you must first erase the block it is contained in.
+To avoid losing data, you must ensure that it has been moved to another location before issuing the erase command. The wipe instruction takes a few milliseconds to complete. The block is then reset and each page is ready to program.
+Program a page: After erasing a block, the program command can be used to convert some 1s to 0s and write the desired page contents to the flash.
+Programming a page is faster than deleting a block, but slower than reading a page on current flash devices.
+
+Each page in the flash chips has an associated state. Pages begin as INVALID.
+All pages within a block are set to ERASED when its block is erased. This resets their content and makes them programmable.
+A page’s status turns to VALID once it is programmed. Programmed means that a page’s contents are set and may be read. Reads are not affected by these states.
+Once a page is programmed, the only way to modify its content is to remove the entire block.
+
+The standard storage interface reads and writes   512
+ -byte blocks (or larger). Over the raw flash chips, the flash-based SSD provides a conventional block interface.
+SRAM (static random access memory) is used for data caching, buffering, and mapping tables. It also has device control logic.
+
+Using multiple flash chips in parallel and write-amplification (FTL’s total write traffic divided by the client’s total write traffic) both increase performance.
+To improve reliability, the FTL tries to evenly distribute writes across the flash blocks. As a result, all blocks will wear out at the same time. This is called wear leveling and is standard in current FTL.
+
+A direct mapping FTL A logical page N
+ read corresponds to a physical page N
+ read. It must first read the entire block containing page N
+, then erase it, and then program the old and new pages.
+Direct-mapped FTL suffers from performance and reliability difficulties. Performance concerns arise from having to read in, erase, and program the entire block for each write. There is a lot of write amplification (proportional to the block size) and poor write performance.
+Also untrustworthy. Reprogramming the same block quickly wears it out and loses data. Insufficient write load distribution among logical blocks leads to premature wear out of the underlying physical blocks containing popular data. It is inconsistent and slow.
+
+
+Most FTLs use logs. A write to logical block   N
+  adds   N
+  to the current block’s free space. This is called logging. The device maintains a mapping table including the physical addresses of all logical blocks.
+
+This basic log structuring method has several flaws. The first is that overwriting logical blocks generates garbage, which requires frequent collection. Second, in-memory mapping tables are expensive. Larger devices require more memory.
+
+The second cost of log-structure is one item every 4
+-KB device page. A single 4
+-byte item on a 4
+-KB page takes up 1
+ GB of memory on a 1
+-TB SSD. Page-level FTL is unusable.
+This reduces mapping costs by Sizeblock
+ divided by Sizepage
+. block-level Greater virtual memory page sizes require less VPN bits and a wider offset in each virtual address.
+A log-based FTL with block-based mapping is sluggish. The fundamental issue is when a “small write” is smaller than a physical block. In this situation, the FTL must read and duplicate the old block’s live data (along with the data from the small write).
+
+Using block-level mapping cuts down on the number of address translations that the FTL has to do.
+
+modern FTLs use hybrid mapping. In hybrid mapping, the FTL keeps a few erased blocks and directs all writes to them. The FTL does not wish to copy these log blocks, thus it saves per-page mappings for these log blocks.
+
+FTL keeps two types of tables:
+the log-table which stores a small set of per-page mappings
+the data table which stores the per-block mappings.
+
+If the FTL can’t find a logical block in the log-table, it looks in the data table to find it.
+
+Flash-based SSDs are becoming prevalent in laptops, desktops, and servers in the world’s data centers.
+A flash chip has multiple banks, each structured into erase blocks (sometimes just called blocks). Each block is broken into pages.
+Blocks are large (128KB
+–2MB
+) and contain several smaller pages (1KB
+–8KB
+).
+To read from flash, send a read command with an address and length.
+Flash is more difficult. Initially, the client must erase the entire block (which deletes all information within it). Once programmed, the client can complete the write.
+A new trim operation is important for informing the device that a certain block (or set of blocks) is no longer required.
+Reliability of flash is largely controlled by wear out; too much erasing and programming destroys flash.
+A flash-based solid-state data works like a regular block-based read/write disk, by using a flash translation layer, it transforms client reads and writes into reads, erases, and programs to underlying flash chips.
+Most FTLs are log-structured, reducing writing costs by reducing erase/program cycles. An in-memory translation layer tracks physical writes.
+The cost of garbage collection leads to write amplification in log-structured FTLs.
+Another issue is the mapping table’s size, which can be rather extensive. Remedies include hybrid mapping or only caching hot FTL parts.
+Last but not least, wear leveling requires the FTL to migrate data from blocks that are mostly read to guarantee they get their fair portion of erase/program load.
