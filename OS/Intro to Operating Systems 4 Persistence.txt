@@ -392,3 +392,86 @@ Most FTLs are log-structured, reducing writing costs by reducing erase/program c
 The cost of garbage collection leads to write amplification in log-structured FTLs.
 Another issue is the mapping table’s size, which can be rather extensive. Remedies include hybrid mapping or only caching hot FTL parts.
 Last but not least, wear leveling requires the FTL to migrate data from blocks that are mostly read to guarantee they get their fair portion of erase/program load.
+
+
+distrubted systems
+Connecting to a web server anywhere in the globe seems straightforward, but it isn’t. These complex services are made up of many machines that work together to make the site work.
+
+We don’t know how to develop “perfect” parts or systems, so we focus on how to make a modern online service seem like it never fails to its users.
+The goal is to build systems that work even when parts of them don’t.
+Failure is a big problem when it comes to building distributed systems.
+Even if one machine fails, that doesn’t mean the entire system must fail. This is one of the great things about distributed systems, and it’s why Google, Facebook, and other web services use them now.
+
+Another problem is performance.
+Because our distributed system is connected by a network, system designers have to think about ways to keep the number of messages sent down and make communication as efficient as possible.
+
+A final concern is security.
+A connection to a remote site must have some trust that the person on the other side is who they say they are and trust that third party cannot monitor or change an ongoing communication between two others.
+
+Communication is new in distributed systems. Specifically, how machines in a distributed system talk to each other.
+In this section, we’ll start with the simplest things first, like messages, and work our way up from there.
+
+It appears that communication is always going to be unreliable with modern networking. Packets are frequently lost, corrupted, or otherwise not delivered over the Internet or through high-speed local networks.
+
+To communicate with UDP, a process uses the sockets API to build a communication endpoint. Processes on the same or a different machine send UDP datagrams which are a fixed-sized message up to some max size.
+
+TCP에 대한 설명
+
+The systems community came up with many approaches to communication abstraction.
+One approach, distributed shared memory (DSM)systems, made it possible for processes on different computers to share a huge virtual address space. This allowed distributed computation to run multiple 
+
+Almost all of the DSM systems work with the OS’s “virtual memory” in one of two ways:
+The page is already local on the machine (best case) because the data can be quickly retrieved, or
+The page must be retrieved from another machine to move on. In this case, the page fault handler contacts the other system to get the page and put it in the process’s page table.
+DSM’s biggest flaws are:
+How it deals with failure -
+If one machine fails, then parts of the data structure or computations become instantly unavailable.
+Its performance -
+Some DSM accesses are cheap, but others are very expensive.
+DSM programmers had to be very careful about how computations were done so that very little communication took place, which was against the point of the approach.threads on different machines instead of on different processors on the same machine.
+
+Despite a lot of research, DSM is no longer used to make sure that distributed systems are safe.
+
+Programming language abstractions make far more sense than OS abstractions for constructing distributed systems. The most common abstraction is a remote procedure call, or RPC.
+The purpose of all remote procedure call packages is to make executing code on a distant machine as straightforward as calling a local function.
+A procedure call is made to a client, and the results are returned after some time. The server merely specifies which routines to export.
+The RPC system handles the rest with a stub generator (sometimes called a protocol compiler) and a run-time library.
+
+Code is also generated for the server:
+Unpack the message.
+Unmarshaling or deserialization removes the information from the incoming message.
+Arguments and function identifiers are extracted from the message.
+Call into the function.
+We have reached the point where the remote function is executed. Runtime RPC calls the function specified by the ID and passes the arguments.
+Package the results.
+The return argument(s) are marshaled back into a single reply buffer.
+Send the reply to the caller.
+A stub compiler must also consider a few more factors. To begin, how does one package and convey a complex data structure?
+Say, an integer file descriptor, a buffer pointer, and a size argument are passed to the write() system call.
+If an RPC package receives a pointer, it must interpret it and take the appropriate action.
+Usually, this is done by annotating the data structures with more information, allowing the compiler to know which bytes need to be serialized.
+Another important thing to think about is how the server handles concurrent tasks.
+One by one, requests come into a simple server and it waits for them in a loop.
+Because if one RPC call takes too long, this can get wildly inefficient.
+Most servers are often built concurrently using thread pools.
+When the server starts, a limited number of worker threads are created.
+When a message comes in, it is sent to one of these worker threads, which then performs the RPC call and sends back the answer.
+While this is going on, the main thread is still receiving messages and may send them to other workers.
+The standard costs also come up, but they mostly come in the form of more complicated programming. The RPC calls may now need locks and other synchronization tools to make sure they work properly.
+
+The run-time library handles the bulk of the work and solves most performance and reliability issues in an RPC system.
+One issue we do see frequently in distributed systems is naming.
+The simplest approaches rely on existing naming systems, such as hostnames and port numbers (a way of identifying a particular communication activity taking place on a machine).
+This way, once the client knows the RPC server’s hostname or IP address and the port number it uses, the internet protocols then allow any machine in the system to send packets to a certain address.
+Once a client knows which server to contact for a certain service, the question becomes which transport-level protocol to use.
+Putting RPC on top of a reliable communication layer could lead to performance issues.
+Remember how reliable communication layers work: acknowledgments plus timeout/retry.
+When a client delivers an RPC request to a server, the server acknowledges the request to let the caller know it was received.
+Similarly, when the server replies to the client, the client acknowledges receipt. Building an RPC protocol on top of a reliable communication layer would send two “extra” messages.
+As a result, many RPC packages rely on unreliable communication protocols like UDP. This allows for a more efficient RPC layer, but also adds the duty of providing reliability.
+Using timeout/retry and acknowledgments, the RPC layer achieves the necessary amount of responsibility.
+The communication layer can ensure that each RPC occurs exactly once or, at most, once by employing sequence numbering.
+
+We have seen the introduction of distributed systems and its fundamental issue: handling failure. Failure is unusual on a desktop machine, but common in a data center with thousands of machines. Managing failure is critical in distributed systems.
+A distributed system’s heart is communication. The RPC package handles all the details, including timeout/retry and acknowledgment, to produce a service that closely resembles a local procedure call.
+The best approach to learn an RPC package is to use it.
