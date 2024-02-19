@@ -475,3 +475,127 @@ The communication layer can ensure that each RPC occurs exactly once or, at most
 We have seen the introduction of distributed systems and its fundamental issue: handling failure. Failure is unusual on a desktop machine, but common in a data center with thousands of machines. Managing failure is critical in distributed systems.
 A distributed system’s heart is communication. The RPC package handles all the details, including timeout/retry and acknowledgment, to produce a service that closely resembles a local procedure call.
 The best approach to learn an RPC package is to use it.
+
+Client applications use the client-side file system to access files and directories. To access files stored on the server, a client program uses the client-side file system to make system calls (open(), read(), write(), close(), mkdir(), etc.). This makes the file system appear the same as the client’s local (disk-based) file system.
+In this approach, distributed file systems enable transparent access to files.
+The client-side file system handles system calls. Examples include when a client calls read(). The client-side file system instructs the server-side file system to read from a specific disk block (or its own in-memory cache).
+It will then copy data into the user buffer supplied to read(), finishing your query. In this case, the block may be cached in memory or disk. No network traffic is generated.
+
+These are the two key components to a client/server distributed file system:
+the client-side file system, and
+the file server.
+Their behavior together determines how the distributed file system functions.
+
+Instead of creating a proprietary and closed system, Sun created an open protocol that merely defined the message formats that clients and servers would use to interact.
+Different parties could design their own NFS servers and compete as long as they preserve interoperability.
+
+This widespread success is likely a testament to NFS’s open-market approach.
+
+The classic NFS protocol (sometimes known as NFSv2) was the standard for many years.
+The protocol design goal for NFSv2 was simple with rapid server recovery.
+This approach makes a lot of sense if you are dealing with a multiple-client, single-server environment. If the server fails, the entire system fails.
+
+NFSv2 achieved the goal of fast crash recovery by designing a stateless protocol.
+To begin, the server does not track client activity; rather, the protocol is designed to send all relevant information in each protocol request.
+
+Lets examine a stateful protocol. Consider the open() system call. If you give it a pathname, open() returns an integer file descriptor. In the code to the left, the descriptor is used to read() or write() to different parts of a file.
+
+Think about how a file system on the client-side file system opens the file.
+The client sends the server a protocol message that says, “Open the file notes and return a descriptor.”
+The file server opens the file and sends its descriptor to the client.
+It then calls read() with the descriptor, and the client-side file system sends the descriptor along with the request for a file.
+
+Here, the file descriptor is a shared state (or distributed state) between the client and server.
+
+Shared state, as stated above, impedes(방해하다) recovery. Assume the server crashes after the first read but before the client sends the second.
+
+After the server restarts, the client issues the second read, but the information was lost in the crash.
+To address this, the client and server would need to have a recovery protocol, where the client would keep enough information in its memory to inform the server of the situation (the file descriptor fd refers to file notes).
+
+A stateful server must also handle client crashes. Assume a user opens a file and crashes. open() uses a file descriptor, so the server doesn’t know when to close it. Normally, a client would call close() to close a file. When a client dies, the server never gets a close().
+
+In order to address these issues, NFS designers chose a stateless approach:
+Each client operation contains all information needed to complete the request.
+
+The file handle is important in understanding the NFS protocol design.
+Many protocol requests include a file handle to uniquely identify the file or directory being operated on.
+A file handle has three key components:
+Volume identification
+tells the server which file system the request is for. An NFS server can export more than one file at a time, so this is important.
+Inode number
+tells the server which file in that partition the request is going to.
+The client’s generation number
+when reusing an inode number If an old file handle is used, the generation number is incremented, preventing inadvertent access to the freshly allocated file.
+
+The file to the left holds a summary of the major pieces of the protocol.
+To access files, the LOOKUP protocol message first obtains a file handle.
+The client sends the server a directory file handle and a file name to lookup, and the server returns the handle and related attributes, such as the file’s creation and modification dates, size, ownership and permissions. Similar to what you’d get from a file’s stat() call.
+
+Imagine the client already has a handle to the file system’s root directory (/) which it would have obtained through the NFS mount protocol.
+
+If a client-side program opens the file /essay.txt, it would send a lookup request for the file handle (and attributes) for the file essay.txt.
+Now, the client can use the READ and WRITE protocol messages to read and write files.
+The READ protocol message requires the protocol to send:
+the file handle,
+offset within the file,
+the quantity of bytes to read, and
+the file name.
+
+The server can then read the data from the file (since the handle tells it which volume and inode to read from) and provide it to the client (or an error if there was a failure).
+
+Writing data to the server is done similarly, except that no data is sent back.
+
+One additional protocol to mention is the GETATTR request. The GETATTR will collect the file’s attributes like the file’s last update time, given only the file handle.
+
+The protocol used between the client and a file servers should be getting a little clearer. The client-side file system keeps track of open files and turns application requests into relevant protocol messages. The server will then respond to protocol messages, which will have all the information needed.
+
+Let’s say we have a small application that reads a file.
+
+First, note how the client keeps track of the relevant state including the file descriptor’s NFS file handle mapping as well as the current file pointer. This allows the client to convert each read request into a properly designed read protocol message telling the server exactly which bytes from the file to read. Following a successful read, the same file handle is used, but the offset is different for each one.
+
+Second, we note where the interactions with the server take place. If the pathname is long (like, /home/codio/workspace/essay.txt), the client would require four lookups:
+one for home,
+one for codio in home,
+one for workspace in codio, and
+one for essay.txt in workspace.
+Third, notice how each server request has all that it needs to complete the request.
+
+server-client간 전송,실패 시나리오시
+
+NFS queries are idempotent(멱등성(연산을 여러 번 적용하더라도 결과가 달라지지 않는 성질)), the client can simply retry. 
+An operation is idempotent if the result of repeating it is the same. 
+Idempotent actions include, for example, storing a value three times in memory. Notably, incrementing a counter three times yields a different outcome than incrementing it once. A read-only operation is usually idempotent, but an update operation must be carefully analyzed.
+
+The idempotency of most common operations lies at the basis of NFS crash recovery. In the absence of an update, LOOKUP and READ queries are trivially idempotent. WRITE requests are also idempotent. If a WRITE fails, the client can simply try again. Data, count, and (most critically) offset are all contained in the WRITE message. It can be repeated knowing that the consequence of several writes is the same as a single write.
+
+some operations are difficult to idempotent. For example, when trying to create a directory that already exists, the mkdir request fails. The file server receives an MKDIR protocol message and executes it properly, but the reply is lost. The client may repeat the action and face that failure.
+
+Sending all read and write requests over the network poses a huge performance issue: the network is slower than local memory or disk.
+How can we measure a distributed file system’s performance?
+Client-side caching, as the huge bold words in the sub-heading above suggest. NFS caches file data (and metadata) read from the server in client memory. While the first access is costly and requires network connectivity, subsequent accesses served from client memory are inexpensive.
+The cache also acts as a write buffer. Before writing to a file, a client application buffers the data in client memory. The application’s write() function succeeds instantly and only puts the data in the client-side file system’s cache. The data is only written to the file server afterwards.
+NFS clients cache data and perform well, right? Well, no. A system with many client caches creates a huge and interesting challenge we’ll call the cache consistency problem.
+
+NFSv2 addresses cache consistency in two ways. By writing to and closing a file, a client software flushes all updates (dirty cache pages) to the server. With flush-on-close, another node will see the latest file version.
+NFSv2 clients also check for changes in a file before accessing its cached data. Each cached block generates a GETATTR request to the server. The client invalidates the file if the server time-of-modification is more recent than the client cache time-of-modification. This clears the client cache and guarantees that subsequent reads get the latest version. The client will use the cached data if it has the latest version of the file.
+
+The stale cache method resulted in an overflow of GETATTR requests on the NFS server. Even if only one client accessed a file (perhaps frequently), the client had to make GETATTR queries to the server to ensure no one else had changed it. That’s why a client keeps asking the server “has anyone edited this file?”
+Now every client has an attribute cache. In the attribute cache, clients still examine files before accessing them. A file’s attributes were cached and timed out when accessed (say 3
+ seconds). If the cached file was safe to use, all file accesses would proceed without contacting the server.
+
+Final thoughts on NFS cache consistency. While the flush-on-close behavior made sense, it caused a performance issue.
+The server would still be required to accept a temporary or short-lived file created on a client and subsequently erased. A better method would hold such temporary files in memory until they are erased, reducing server contact and possibly improving performance.
+Adding an attribute cache to NFS made it difficult to determine what version of a file one was getting. Because your attribute cache had not yet timed out, the client was delighted to offer you whatever was in client memory. This was great most of the time, but occasionally led to weird behavior.
+
+NFS servers must commit each write to persistent storage before telling the client of success.
+The issue with this requirement in NFS server implementation is that write performance might be a substantial bottleneck.
+Companies like Network Appliance were created with the goal of building an NFS server that performs writes quickly. They do this using a few work-arounds:
+For example, they put writes in a battery-backed memory, allowing rapid answers to WRITE requests without danger of losing data or incurring the cost of writing to disk immediately.
+
+Initiation of NFS (Network File System NFS is meant to allow simple and rapid server recovery. Because a client can safely replay a failed action, it doesn’t matter if the server did it.
+Caching can potentially complicate a multi-client, single-server system. It’s reasonable to address cache consistency, which NFS does carelessly, resulting in weird behavior. To sum up, forcing writes to stable storage before returning success (otherwise data can be lost).
+We haven’t discussed other aspects, most notably security. Early NFS security was inadequate; any user on a client could easily masquerade as another user and so access nearly any file.
+An NFS stateless protocol is the key to achieving the core goal of rapid and simple crash recovery. After a server crash, clients just retry requests until they succeed.
+Making requests idempotent is a central aspect of the NFS protocol. An operation is idempotent if repeating it has the same result as doing it once. In NFS, idempotency unifies client lost-message retransmission and client-server crash handling.
+Client-side caching and write buffering are required for performance, but pose a cache consistency issue.
+NFS implementations engineer cache integrity in different ways: When a file is closed, its contents are forced to the server, allowing other clients to see the updates. An attribute cache decreases the frequency of file change checks with the server (via GETATTR requests).
