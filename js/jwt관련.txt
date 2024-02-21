@@ -1,0 +1,6 @@
+jwt(json web token)이 보안문제점을 가진단건 알겠다. 근데 refresh token으로는 해결이 안되는거 같은데? 안되는거 알면서도 성능때문에 쓰는건가?
+
+좀더 나은거라고 한다. refresh token은 오직 access token이 expire되었을때만 보내야함.
+
+어차피 symmetric key로 상호간 암호화해서 안보내나?
+
