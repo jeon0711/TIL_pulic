@@ -599,3 +599,99 @@ An NFS stateless protocol is the key to achieving the core goal of rapid and sim
 Making requests idempotent is a central aspect of the NFS protocol. An operation is idempotent if repeating it has the same result as doing it once. In NFS, idempotency unifies client lost-message retransmission and client-server crash handling.
 Client-side caching and write buffering are required for performance, but pose a cache consistency issue.
 NFS implementations engineer cache integrity in different ways: When a file is closed, its contents are forced to the server, allowing other clients to see the updates. An attribute cache decreases the frequency of file change checks with the server (via GETATTR requests).
+
+The Andrew File System was developed with the simple goal of scaling.
+How can a distributed file system be designed to support as many clients as possible?
+
+All AFS versions support whole-file caching on the client’s local disk. In order to open() a file, the server must first obtain it from the server’s storage. Read and write operations are redirected to the local file system, avoiding network communication. close() returns the modified file to the server.
+
+To start, the AFS client-side code (dubbed Venus by the AFS creators) sends a Fetch protocol message to the server.
+
+These system calls are fully local (no server contact) and point to the local copy of the file. Due to the local nature of read() and write(), a block may be cached in client memory. So AFS uses client RAM to cache disk blocks. AFS client checks if the file has been updated (opened for writing) and communicates it to the server via a Store protocol message if so.
+
+When the file is accessed again, AFSv1 is much faster. If the file has changed, this code checks with the server (using the TestAuth protocol). It uses a locally cached copy to prevent a network transmission. Above is a graphic of AFSv1 protocol messages. It used to caching file contents, leaving directories on the server.
+
+Lesser known AFS issues prompted the designers to revise their file system. The AFS designers spent a lot of time measuring their existing prototype to find out what was incorrect. Measurement is essential to understanding how systems work and how to improve them.
+The authors observed two major issues with AFSv1:
+The costs of path-traversal were too high:
+When using the Fetch or Store protocol, the client sends the whole pathname (e.g., /codio/ workspace/notes.txt) to the server.
+To access the file, the server must first seek in the root directory for codio, then in home for workspace, and so on until the file is found.
+Many clients visiting the server at once meant the server was spending a lot of time simply walking directory paths.
+Too many TestAuth protocol messages were being issued by the client:
+AFSv1 generated a lot of traffic to check if a local file (or its stats) was valid with the TestAuth protocol message. Servers spent a lot of time telling clients whether they may use cached copies of files. Most of the time, the file had not changed.
+They also found smaller issues.
+AFSv1 didn’t balance load across servers:
+This issue was corrected by introducing volumes.
+Volumes meant that an administrator could move across servers to balance the load.
+It used a single process per client:
+This caused context switching and other overheads.
+The issue was solved by building the server with threads instead of processes in AFSv2.
+We will focus only on the two major problems.
+Making Changes
+The two major problems above severely limited scalability.
+The server CPU bottlenecked the system, and each server could only serve 20
+ clients without being overloaded.
+Servers were receiving too many TestAuth messages and spent too much time traversing the directory structure. So the AFS designers had to solve the problem of redesigning the protocol to limit the number of server interactions and to make server interactions more efficient.
+A new protocol addressing these difficulties would result in a far more scalable: AFSv2.
+
+Client/server interactions were reduced with AFSv2. With a callback, the server assures that a cached file will be updated. An invalid cached file no longer requires contacting the server. Until the server says otherwise, it assumes the file is valid.
+
+AFSv2 uses a file identifier (FID) instead of pathnames, like NFS. Volum, file, and “uniquifier” are all AFS FIDs (to enable reuse of the volume and file IDs when a file is deleted). It would save the server time by walking pathnames one by one instead of transmitting whole pathnames.
+
+Here the client would first fetch codio, cache it locally, and then set up a home callback. Next, the client would fetch workspace, save it locally, and call it. The caller application gets this file descriptor, as summarized in the figure to the left.
+
+Unlike NFS, the AFS client would establish a callback with the server with each directory or file fetch.
+
+In case the server’s cached state changed, the client would be notified The first access to the file creates several client-server messages, as well as callbacks for all folders and files. Because AFS caches files locally, it behaves like a disk-based file system. A second access to a file should be as fast as accessing it locally.
+
+When an updated file closes, AFS makes the update accessible on the server and invalidates cached copies. A client writes to a file (perhaps repeatedly). The server then flushes the new file. If any clients have cached copies, the server contacts each client and informs them that their callback is no longer valid. In order to read older versions of the file, clients must re-download them from the server (and will also serve to reestablish a callback on the new version of the file).
+
+AFS departs from this basic principle within a single procedure. The file write events are visible to other local processes. Simple UNIX rules dictate(명령) that only one machine be used. Only switching machines would reveal the AFS consistency mechanism.
+
+Further discussion is warranted(보증된) on one machine. Because AFS uses the Last Writer Wins approach when many processes on separate machines modify a file simultaneously. It’s worth noting that the “winning” file is the one that closes last. As a result, just one client created the file. Unlike NFS, where individual block updates are flushed to the server, the final file on the server may contain updates from both clients. An example of this is when two clients write to a JPEG image in different places.
+
+An event timeline is shown on the left.(ASF3.png) They show two processes on Client1 (P1
+ and P2
+), one on Client2 (P3
+), and the server (Server
+) all working on a single file (F
+). The figure for the server only shows the file contents after the left operation. Read it and try to understand the effects of each read. You can use the right commentary field to get help.
+
+AFS crash recovery is a bit more involved than with NFS.
+
+Consider a situation where a server (  S1
+ ) cannot reach a client (  C1
+ ) while the client is rebooting. Let’s say   C1
+  had file   F
+  cached on its local drive, and then   C2
+  (another client) changed it. This would cause the server to notify all clients cached the file to delete it.
+
+Because C1
+ may miss vital communications after rebooting, C1
+ should treat all cache contents as suspect when rejoining the system, and send a TestAuth message to verify.
+
+If the C1
+'s cached copy of file F
+ is still valid, C1
+ can use it; if not, C1
+ should fetch the latest version from the server.
+
+Server recovery is also more difficult.
+
+Because callbacks are retained in memory, a server cannot tell which client machine has what files when it restarts.
+
+Thus, upon server restart, each client must recognize that the server has crashed, suspect all cache contents, and verify the legitimacy of files before utilizing them.
+
+The importance of notifying clients of server failures is underscored by the risk of stale files being accessed.
+
+There are numerous ways to implement such recovery:
+having the server send a message to each client that indicates that cached contents should not be trusted, or
+having clients periodically check that the server is still alive with a heartbeat message.
+
+Building a scalable and appropriate caching architecture is not free. It comes at a cost; with NFS, clients barely noticed a server crash.
+
+Like Berkeley FFS, AFS designers added features to make the system easier to use and administer:
+By providing a genuine global namespace to clients, AFS ensures that all files are named the same way.
+AFS takes security seriously, incorporating means to authenticate users and keep files private if requested.
+AFS allows for user-controlled access. Using AFS, a user may regulate who can access which files.
+AFS introduces tools to make server management easier for system administrators. AFS was much ahead of the curve in terms of system administration.
