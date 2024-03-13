@@ -1,0 +1,4 @@
+클래스 패스
+set classpath명령어로 확인한다
+set classpath=경로;경로로 할당
+패키지
